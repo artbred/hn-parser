@@ -1,0 +1,45 @@
+name: Weekly HN Stories Update
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  update-dataset:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Build HN Parser
+      run: go build -o hn_parser main.go
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Python dependencies
+      run: |
+        pip install pandas datasets huggingface_hub pyarrow
+
+    - name: Run Update Script
+      env:
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      run: python scripts/update_dataset.py
+
+    - name: Model Rebuild
+      uses: peter-evans/repository-dispatch@v3
+      with:
+        token: ${{ secrets.PRIVATE_REPO_DISPATCH_TOKEN }}
+        repository: artbred/hn-virality
+        event-type: dataset-updated
+        client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
+
